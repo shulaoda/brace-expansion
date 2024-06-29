@@ -6,18 +6,16 @@ pub enum GlobNode {
   Pattern(Vec<GlobNode>),
 }
 
-fn scan_capacity(glob: &[u8], start: usize, end: usize, stop_with_brace_end: bool) -> usize {
-  let mut pattern_extend = false;
-
+fn scan_capacity(glob: &[u8], mut start: usize, end: usize, stop_with_brace_end: bool) -> usize {
   let mut count = 0;
-  let mut current = start;
 
   let mut braces = 0;
   let mut in_brackets = false;
+  let mut pattern_extend = false;
 
-  while current < end {
-    match glob[current] {
-      b'\\' => current += 1,
+  while start < end {
+    match glob[start] {
+      b'\\' => start += 1,
       b'[' => in_brackets = true,
       b']' => in_brackets = false,
       b',' if !in_brackets && braces == 1 && stop_with_brace_end => count += 1,
@@ -35,36 +33,33 @@ fn scan_capacity(glob: &[u8], start: usize, end: usize, stop_with_brace_end: boo
           pattern_extend = false;
         }
       }
-      _ if braces == 0 => {
-        if !pattern_extend {
+      _ => {
+        if braces == 0 && !pattern_extend {
           count += 1;
           pattern_extend = true;
         }
       }
-      _ => {}
     }
-    current += 1;
+    start += 1;
   }
 
   count
 }
 
-fn parse_pattern(glob: &[u8], start: usize, end: usize) -> GlobNode {
+fn parse_pattern(glob: &[u8], mut start: usize, end: usize) -> GlobNode {
   let capacity = scan_capacity(glob, start, end, false);
 
   let mut pattern: Vec<GlobNode> = Vec::with_capacity(capacity);
   let mut pattern_extend = false;
 
-  let mut current = start;
-
   let mut braces = 0;
   let mut in_brackets = false;
   let mut brace_pattern_count = 1;
-  let mut brace_pattern_start = current;
+  let mut brace_pattern_start = start;
 
-  while current < end {
-    match glob[current] {
-      b'\\' => current += 1,
+  while start < end {
+    match glob[start] {
+      b'\\' => start += 1,
       b'[' => in_brackets = true,
       b']' => in_brackets = false,
       b'{' if !in_brackets => {
@@ -73,15 +68,15 @@ fn parse_pattern(glob: &[u8], start: usize, end: usize) -> GlobNode {
         if braces == 1 {
           pattern_extend = false;
           brace_pattern_count = 1;
-          brace_pattern_start = current + 1;
+          brace_pattern_start = start + 1;
         }
       }
       b'}' if !in_brackets && braces > 0 => {
         braces -= 1;
 
         if braces == 0 {
-          let node = if current > brace_pattern_start {
-            parse_pattern(glob, brace_pattern_start, current)
+          let node = if start > brace_pattern_start {
+            parse_pattern(glob, brace_pattern_start, start)
           } else {
             GlobNode::None
           };
@@ -98,8 +93,8 @@ fn parse_pattern(glob: &[u8], start: usize, end: usize) -> GlobNode {
         }
       }
       b',' if !in_brackets && braces == 1 => {
-        let node = if current > brace_pattern_start {
-          parse_pattern(glob, brace_pattern_start, current)
+        let node = if start > brace_pattern_start {
+          parse_pattern(glob, brace_pattern_start, start)
         } else {
           GlobNode::None
         };
@@ -117,21 +112,22 @@ fn parse_pattern(glob: &[u8], start: usize, end: usize) -> GlobNode {
           pattern.push(GlobNode::Brace(0, brace));
         }
 
-        brace_pattern_start = current + 1;
+        brace_pattern_start = start + 1;
       }
-      _ if braces == 0 => {
-        if pattern_extend {
-          if let Some(GlobNode::Range(_, ref mut end)) = pattern.last_mut() {
-            *end += 1;
+      _ => {
+        if braces == 0 {
+          if pattern_extend {
+            if let Some(GlobNode::Range(_, ref mut end)) = pattern.last_mut() {
+              *end += 1;
+            }
+          } else {
+            pattern_extend = true;
+            pattern.push(GlobNode::Range(start, start + 1));
           }
-        } else {
-          pattern_extend = true;
-          pattern.push(GlobNode::Range(current, current + 1));
         }
       }
-      _ => {}
     }
-    current += 1;
+    start += 1;
   }
 
   match pattern.len() {
