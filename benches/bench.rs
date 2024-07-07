@@ -1,29 +1,19 @@
-use brace_expansion::parse_brace;
+use brace_expansion::*;
 use criterion::{criterion_group, criterion_main, Criterion};
 
-fn brace(b: &mut Criterion) {
-  b.bench_function("brace", |b| {
-    b.iter(|| parse_brace("some/**/{a,b{c,de},{g,l}}.js".as_bytes()))
+static PATH: &'static str = "some/abc/ccc.666";
+static GLOB: &'static str = "some/abc/ccc.{{1,2,3,4,5,6},2,3,4,5,6}{1,{1,2,3,4,5,6},3,4,5,6}{1,2,{1,2,3,4,5,{1,2,3,4,5,6}},4,5,6}";
+
+fn mine(b: &mut Criterion) {
+  b.bench_function("mine", |b| {
+    b.iter(|| {
+      let glob = GLOB.as_bytes();
+      let mut node = Pattern::with(glob).unwrap();
+
+      while node.trigger(glob, node.value.len()) {}
+    })
   });
 }
 
-fn more_brace(b: &mut Criterion) {
-  b.bench_function("more_brace", |b| {
-    b.iter(|| parse_brace("{a,b{c,de},{g,l}}{c,d}{e}{f}{g}{h}{i}{j}{k}{l}.js".as_bytes()))
-  });
-}
-
-fn empty_brace(b: &mut Criterion) {
-  b.bench_function("empty_brace", |b| {
-    b.iter(|| parse_brace("{a,b{c,de},{g,l}}{}{}{}{}{}{}{}{}{}.js".as_bytes()))
-  });
-}
-
-fn without_brace(b: &mut Criterion) {
-  b.bench_function("without_brace", |b| {
-    b.iter(|| parse_brace("some/**/[e,bcc,de*,[g,l]].js".as_bytes()))
-  });
-}
-
-criterion_group!(benches, brace, more_brace, empty_brace, without_brace);
+criterion_group!(benches, mine);
 criterion_main!(benches);
