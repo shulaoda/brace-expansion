@@ -7,6 +7,17 @@ pub struct Pattern {
 impl Pattern {
   pub fn with(glob: &[u8]) -> Option<Self> {
     if let Some(branch) = Self::brace(glob) {
+      if branch.is_empty() {
+        let value = glob.to_vec();
+        let shadow = Vec::<(usize, usize)>::with_capacity(0);
+
+        return Some(Pattern {
+          value,
+          branch,
+          shadow,
+        });
+      }
+
       let value = Vec::with_capacity(glob.len());
       let shadow = Vec::<(usize, usize)>::new();
 
