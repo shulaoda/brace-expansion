@@ -6,17 +6,20 @@ pub struct Pattern {
 
 impl Pattern {
   pub fn with(glob: &[u8]) -> Option<Self> {
-    Self::brace(glob).map(|branch| {
+    if let Some(branch) = Self::brace(glob) {
       let value = Vec::with_capacity(glob.len());
-      let shadow = Vec::new();
+      let shadow = Vec::<(usize, usize)>::new();
+
       let mut node = Pattern {
         value,
         branch,
         shadow,
       };
+
       node.track(glob);
-      node
-    })
+      return Some(node);
+    }
+    None
   }
 
   pub fn brace(glob: &[u8]) -> Option<Vec<(u8, u8)>> {
@@ -141,29 +144,15 @@ mod tests {
   use super::*;
 
   #[test]
-  fn test() {
-    let glob = b"some/{,b{c,d}f,e}/ccc.{png,jpg}";
-    let mut node = Pattern::with(glob).unwrap();
-
-    println!("{}", node.trigger(glob, node.value.len()));
-    println!("{:?}", String::from_utf8(node.value));
-  }
-
-  #[test]
-  fn test2() {
+  fn brace_expansion() {
     let glob = b"some/{a,b{c,d}f,e}/ccc.{png,jpg}";
     let mut node = Pattern::with(glob).unwrap();
 
-    while node.trigger(glob, node.value.len()) {
-      println!("{:?}", String::from_utf8(node.value.clone()));
-    }
-  }
-
-  #[test]
-  fn create_glob_test() {
-    let glob = b"some/{a,b{c,d}f,e}/ccc.{png,jpg}";
-    if let Some(node) = Pattern::with(glob) {
-      println!("{:?}", String::from_utf8(node.value));
+    loop {
+      println!("{:?}", String::from_utf8(node.value.clone()).unwrap());
+      if !node.trigger(glob, node.value.len()) {
+        break;
+      }
     }
   }
 }
